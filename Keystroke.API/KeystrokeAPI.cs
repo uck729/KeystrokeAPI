@@ -27,6 +27,11 @@ namespace Keystroke.API
 			this.currentModuleId = User32.GetModuleHandle(currentModudle.ModuleName);
 		}
 
+        public void test()
+        {
+            Console.WriteLine(true);
+        }
+
 		public void CreateKeyboardHook(Action<KeyPressed> keyPressedCallback)
 		{
 			this.keyPressedCallback = keyPressedCallback;
