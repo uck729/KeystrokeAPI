@@ -15,6 +15,8 @@ namespace Keystroke.API
 		private const int WH_MOUSE_LL = 14;
 		private const int WM_KEYDOWN = 0x100;
 		private const int WM_SYSKEYDOWN = 0x104;
+        private const int WM_KEYUP = 0x0101;
+        private const int WM_SYSKEYUP = 0x0105;
         private User32.LowLevelHook HookKeyboardDelegate; //We need to have this delegate as a private field so the GC doesn't collect it
         private Action<KeyPressed> keyPressedCallback;
 
@@ -36,7 +38,7 @@ namespace Keystroke.API
 		{
 			int wParamAsInt = wParam.ToInt32();
 
-			if (nCode >= 0 && (wParamAsInt == WM_KEYDOWN || wParamAsInt == WM_SYSKEYDOWN))
+			if (nCode >= 0 && (wParamAsInt == WM_KEYDOWN || wParamAsInt == WM_SYSKEYDOWN || wParamAsInt == WM_KEYUP || wParamAsInt == WM_SYSKEYUP))
 			{
 				bool shiftPressed = false;
 				bool capsLockActive = false;
@@ -50,9 +52,24 @@ namespace Keystroke.API
 				if (User32.GetKeyState(KeyCode.Capital) == 1)
 					capsLockActive = true;
 
-				KeyParser(wParam, lParam, shiftPressed, capsLockActive);
+				KeyParser(wParam, lParam, shiftPressed, capsLockActive, false);
 			}
+            else if(nCode >= 0 && (wParamAsInt == WM_KEYUP || wParamAsInt == WM_SYSKEYUP))
+            {
+                bool shiftPressed = false;
+                bool capsLockActive = false;
 
+                var shiftKeyState = User32.GetAsyncKeyState(KeyCode.ShiftKey);
+                if (FirstBitIsTurnedOn(shiftKeyState))
+                    shiftPressed = true;
+
+                //We need to use GetKeyState to verify if CapsLock is "TOGGLED" 
+                //because GetAsyncKeyState only verifies if it is "PRESSED" at the moment
+                if (User32.GetKeyState(KeyCode.Capital) == 1)
+                    capsLockActive = true;
+
+                KeyParser(wParam, lParam, shiftPressed, capsLockActive, true);
+            }
 			//Chain to the next hook. Otherwise other applications that 
 			//are listening to this hook will not get notificied
 			return User32.CallNextHookEx(globalKeyboardHookId, nCode, wParam, lParam);
@@ -64,7 +81,7 @@ namespace Keystroke.API
 			return Convert.ToBoolean(value & 0x8000);
 		}
 
-		private void KeyParser(IntPtr wParam, IntPtr lParam, bool shiftPressed, bool capsLockPressed)
+		private void KeyParser(IntPtr wParam, IntPtr lParam, bool shiftPressed, bool capsLockPressed, bool keyReleased)
 		{
 			var keyValue = (KeyCode)Marshal.ReadInt32(lParam);
 
